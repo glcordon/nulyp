@@ -1,0 +1,6 @@
+; $Id: 
+name = Hasta Shortcodes
+description = Shortcodes for Hasta theme
+package = "NikaDevs"
+version = "7.x - 1.0"
+core = 7.x

@@ -1,0 +1,7 @@
+;$Id$
+
+name = tophat
+description = Custom mdodule 
+core = 7.x
+package = tophat
+files[]= tophat.module

@@ -1,0 +1,664 @@
+<?php
+
+function _get_node_field($node, $field, $lang = 'en') {
+  global $language;
+  $var = FALSE;
+  if(!empty($node->{$field}[$lang])) {
+      $var = $node->{$field}[$lang];
+  } elseif(!empty($node->{$field}[$language->language])) {
+      $var = $node->{$field}[$language->language];
+  } elseif(!empty($node->{$field}['und'])) {
+      $var = $node->{$field}['und'];
+  } elseif(!empty($node->{$field})) {
+      $var = $node->{$field};
+  }
+  return $var;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function hasta_cms_init() {
+  global $user;
+  if(variable_get('maintenance_mode', 0) && !$user->uid && !in_array($_GET['q'], array('user', 'user/login'))) {
+    $_GET['q'] = 'maintenance';
+  }
+}
+
+/**
+ * Implements hook_user_login().
+ */
+function hasta_cms_user_login(&$edit, $account) {
+  $edit['redirect'] = '<front>';
+}
+
+/**
+ * Implements hook_menu().
+ */
+function hasta_cms_menu() {
+  //$node = node_load(92);unset($node->nid, $node->vid, $node->created);node_save($node);
+  $items['page-404'] = array(
+    'title' => 'Page not Found',
+    'page callback' => 'theme',
+    'page arguments' => array('hasta_cms_page_404'),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['page-404-2'] = array(
+    'title' => 'Page not Found',
+    'page callback' => 'theme',
+    'page arguments' => array('hasta_cms_page_404_2'),
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['maintenance'] = array(
+    'title' => 'Maintenance',
+    'page callback' => 'hasta_cms_maintenance',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function hasta_cms_maintenance() {
+  return '';
+}
+
+/**
+ * Implements hook_theme().
+ */
+function hasta_cms_theme($existing, $type, $theme, $path) {
+  return array(
+    'hasta_cms_page_404' => array(
+      'variables' => array(),
+    ),
+    'hasta_cms_page_404_2' => array(
+      'variables' => array(),
+    ),
+    'hasta_cms_author_info' => array(
+      'variables' => array('node' => NULL),
+    ),
+    'hasta_cms_related_posts' => array(
+      'variables' => array('view' => NULL),
+    ),
+  );
+}
+
+function hasta_cms_menu_edit_item_validate($form, &$form_state) {
+  $values = $form_state['values'];
+  if(strpos($values['link_path'], '#') === 0) {
+    $values['link_path'] = str_replace('#', 'http://_anchor_', $values['link_path']);
+    form_set_value(array('#parents' => array('link_path')), $values['link_path'], $form_state);
+  }
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function hasta_cms_form_alter(&$form, &$form_state, $form_id) {
+  switch ($form_id) {
+    case 'menu_edit_item':
+      if (isset( $form['link_path']['#default_value'])) {
+        $form['link_path']['#default_value'] = str_replace('http://_anchor_', '#', $form['link_path']['#default_value']);
+        array_unshift($form['#validate'], 'hasta_cms_menu_edit_item_validate');        
+      }
+      break;
+    case 'user_login':
+      if(arg(0) == 'user') {
+        if(isset($form['hybridauth'])) {
+          $form['hybridauth']['#weight'] = -30;
+          $form['hybridauth']['#suffix'] = '<div class="spacer-t30 spacer-b30">
+            <div class="tagline"><span> ' . t('OR  Login') . '</span></div><!-- .tagline -->
+          </div>';
+        }
+        $form['#prefix'] = '<div class = "row"><div class = "col-md-7 col-centered"><div class = "text-box padding-4 border"><h4 class="uppercase">' .t('Login Form') . '</h4>';
+        $form['#suffix'] = '</div></div></div>';
+        unset($form['name']['#description'], $form['pass']['#description']);
+        $form['actions']['submit']['#attributes']['class'][] = 'btn-primary';
+        $form['actions']['submit']['#attributes']['class'][] = 'btn-medium';
+        $form['actions']['submit']['#attributes']['class'][] = 'btn-color-set';
+        $form['name']['#nd_icon'] = 'fa fa-user';
+        $form['pass']['#nd_icon'] = 'fa fa-lock';
+      }
+      break;
+    case 'user_pass':
+      $form['#prefix'] = '<div class = "row"><div class = "col-md-7 col-centered"><div class = "text-box padding-4 border"><h4 class="uppercase">' .t('Restore Password Form') . '</h4>';
+      $form['#suffix'] = '</div></div></div>';
+      $form['actions']['submit']['#attributes']['class'] = array('btn-medium', 'btn-primary', 'btn-color-set');
+      break;
+    case 'user_register_form':
+      if(isset($form['hybridauth'])) {
+        $form['hybridauth']['#weight'] = -30;
+        $form['hybridauth']['#suffix'] = '<div class="spacer-t30 spacer-b30">
+          <div class="tagline"><span> ' . t('OR  Register') . '</span></div><!-- .tagline -->
+        </div>';
+      }
+      $form['#prefix'] = '<div class = "row"><div class = "col-md-7 col-centered"><div class = "text-box padding-4 border"><h4 class="uppercase">' .t('Register Form') . '</h4>';
+      $form['#suffix'] = '</div></div></div>';
+      $form['actions']['submit']['#attributes']['class'] = array('btn-medium', 'btn-primary', 'btn-color-set');
+      break;
+    case 'search_block_form':
+      $form['search_block_form']['#prefix'] = '<div class = "error-search-box">';
+      $form['actions']['#suffix'] = '</div>';
+      $form['search_block_form']['#attributes']['class'][] = 'email_input';
+      $form['search_block_form']['#attributes']['class'][] = 'class-lock';
+      $form['actions']['submit']['#attributes']['class'][] = 'input_submit';
+      break;
+    case 'search_form':
+      $form['basic']['keys']['#prefix'] = '<div class = "search-wrap"><button class="search-button animate" type="submit" title="Start Search"><i class="fa fa-search"></i></button>';
+      $form['basic']['keys']['#suffix'] = '</div>';
+      $form['basic']['keys']['#title'] = t('Search..');
+      $form['basic']['submit']['#attributes']['class'][] = 'hidden';
+      break;
+  }
+}
+
+/**
+ * Implements hook_theme_registry_alter().
+ */
+function hasta_cms_theme_registry_alter(&$theme_registry) {
+  $theme_registry['nikadevs_cms_block_settings']['path'] = drupal_get_path('theme', 'hasta') . '/templates';
+}
+
+function hasta_cms_preprocess_block(&$variables) {
+  $settings = variable_get('nikadevs_cms_block_settings_' . variable_get('theme_default', 'none'), array());
+
+  $variables['title_tag'] = 'h5';
+  $variables['title_type'] = 'widget-title';
+  $variables['title_padding_bottom'] = '';
+  $variables['padding_bottom'] = '';
+  $id = $variables['block']->module . '_' . $variables['block']->delta;
+  if(isset($settings[$id])) {
+    if(isset($settings[$id]['animation_delay']) && !empty($settings[$id]['animation_delay'])) {
+      $variables['attributes_array']['data-wow-duration'] = $settings[$id]['animation'];
+    }
+    if(isset($settings[$id]['animation']) && !empty($settings[$id]['animation'])) {
+      $variables['attributes_array']['class'] = 'wow ' . $settings[$id]['animation'];
+      unset($variables['attributes_array']['data-animation'], $variables['attributes_array']['data-animation-delay']);
+    }
+    if(isset($settings[$id]['padding_bottom']) && $settings[$id]['padding_bottom']) {
+      $variables['classes_array'][] = $settings[$id]['padding_bottom'];
+    }
+    $variables['title_tag'] = isset($settings[$id]['title_tag']) ? $settings[$id]['title_tag'] : $variables['title_tag'];
+    $variables['title_type'] = isset($settings[$id]['title_type']) && $settings[$id]['title_type'] ? $settings[$id]['title_type'] : $variables['title_type'];
+    $variables['padding_bottom'] = isset($settings[$id]['padding_bottom']) && $settings[$id]['padding_bottom'] ? $settings[$id]['padding_bottom'] : $variables['padding_bottom'];
+    $variables['title_padding_bottom'] = isset($settings[$id]['title_padding_bottom']) && $settings[$id]['title_padding_bottom'] ? $settings[$id]['title_padding_bottom'] : $variables['title_padding_bottom'];
+
+  }
+}
+
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function hasta_cms_field_formatter_info() {
+  return array(
+    'hasta_cms_images_main_small' => array(
+      'label' => t('Hasta: Images One Main'),
+      'field types' => array('image'),
+      'settings'  => array(
+        'image_style_name' => '',
+        'image_style_name_small' => '',
+        'zoom' => TRUE
+      ),
+    ),
+    'hasta_cms_image_link' => array(
+      'label' => t('Hasta: Image With Hover Link'),
+      'field types' => array('image'),
+      'settings'  => array(
+        'image_style_name' => '',
+      ),
+    ),
+    'hasta_cms_image_date' => array(
+      'label' => t('Hasta: Image With Post Date'),
+      'field types' => array('image'),
+      'settings'  => array(
+        'image_style_name' => '',
+      ),
+    ),
+    'hasta_cms_date_underline' => array(
+      'label' => t('Hasta: Date with underline'),
+      'field types' => array('datetime'),
+    ),
+    'hasta_cms_tags' => array(
+      'label' => t('Hasta: Tags'),
+      'field types' => array('taxonomy_term_reference'),
+    ),
+
+
+    'hasta_cms_images_slider' => array(
+      'label' => t('Hasta: Images Slider'),
+      'field types' => array('image'),
+      'settings'  => array(
+        'image_style_name' => '',
+      ),
+    ),
+    'hasta_cms_lead_text' => array(
+      'label' => t('Hasta: Lead text'),
+      'field types' => array('text_long'),
+    ),
+    'hasta_cms_title' => array(
+      'label' => t('Hasta: Title'),
+      'field types' => array('text'),
+      'settings'  => array(
+        'tag' => 'h1',
+      ),
+    ),
+    'hasta_cms_price' => array(
+      'label' => t('Hasta: Price'),
+      'field types' => array('commerce_price', 'price'),
+      'settings'  => array(
+        'tag' => 'h1',
+      ),
+    ),
+    'hasta_cms_social_links' => array(
+      'label' => t('hasta: Social Links'),
+      'field types' => array('link_field'),
+    ),
+    'hasta_cms_button_link' => array(
+      'label' => t('hasta: Button Link'),
+      'field types' => array('link_field'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_settings_form().
+ */
+function hasta_cms_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
+  //This gets the view_mode where our settings are stored
+  $display = $instance['display'][$view_mode];
+  //This gets the actual settings
+  $settings = $display['settings'];
+  switch($display['type']) {
+    case 'hasta_cms_image_link':
+      $element = array();
+      $image_styles = array();
+      foreach(image_styles() as $name => $image_style) {
+        $image_styles[$name] = $image_style['label'];
+      }
+      $element['image_style_name'] = array(
+        '#type' => 'select',
+        '#title' => t('Image Style for Main Image'),
+        '#default_value' => $settings['image_style_name'],
+        '#options' => $image_styles
+      );
+      break;
+    case 'hasta_cms_images_main_small':
+      $element = array();
+      $image_styles = array();
+      foreach(image_styles() as $name => $image_style) {
+        $image_styles[$name] = $image_style['label'];
+      }
+      $element['image_style_name'] = array(
+        '#type' => 'select',
+        '#title' => t('Image Style for Main Image'),
+        '#default_value' => $settings['image_style_name'],
+        '#options' => $image_styles
+      );
+      $element['image_style_name_small'] = array(
+        '#type' => 'select',
+        '#title' => t('Image Style for Small Images'),
+        '#default_value' => $settings['image_style_name_small'],
+        '#options' => $image_styles
+      );
+      break;
+    case 'hasta_cms_image_date':
+      $element = array();
+      $image_styles = array();
+      foreach(image_styles() as $name => $image_style) {
+        $image_styles[$name] = $image_style['label'];
+      }
+      $element['image_style_name'] = array(
+        '#type' => 'select',
+        '#title' => t('Image Style for Main Image'),
+        '#default_value' => $settings['image_style_name'],
+        '#options' => $image_styles
+      );
+      break;
+
+    case 'hasta_cms_images_slider':
+      $element = array();
+      $image_styles = array();
+      foreach(image_styles() as $name => $image_style) {
+        $image_styles[$name] = $image_style['label'];
+      }
+      $element['image_style_name'] = array(
+        '#type' => 'select',
+        '#title' => t('Image Style for Main Image'),
+        '#default_value' => $settings['image_style_name'],
+        '#options' => $image_styles
+      );
+      break;
+    case 'hasta_cms_title':
+      $element = array();
+      $tags = array('h1', 'h2', 'h3', 'h4', 'h5', 'h6');
+      $element['tag'] = array(
+        '#type' => 'select',
+        '#title' => t('Tag'),
+        '#default_value' => $settings['tag'],
+        '#options' => array_combine($tags, $tags)
+      );
+      break;
+    case 'hasta_cms_price':
+      $element = array();
+      $tags = array('h1', 'h2', 'h3', 'h4', 'h5', 'h6');
+      $element['tag'] = array(
+        '#type' => 'select',
+        '#title' => t('Tag'),
+        '#default_value' => $settings['tag'],
+        '#options' => array_combine($tags, $tags)
+      );
+      break;
+  }
+  return $element;
+}
+
+/**
+ * Implements hook_field_formatter_settings_summary().
+ */
+function hasta_cms_field_formatter_settings_summary($field, $instance, $view_mode) {
+  $display = $instance['display'][$view_mode];
+  switch($display['type']) {
+    case 'hasta_cms_image_link':  
+      $settings = $display['settings'];
+      $image_styles = image_styles();
+      $style_name = isset($image_styles[$settings['image_style_name']]['label']) ? $image_styles[$settings['image_style_name']]['label'] : 'Original';
+      $summary = t('Image size @style', array(
+        '@style' => $style_name,
+      ));
+      return $summary;
+    case 'hasta_cms_images_main_small':  
+      $settings = $display['settings'];
+      $image_styles = image_styles();
+      $style_name = isset($image_styles[$settings['image_style_name']]['label']) ? $image_styles[$settings['image_style_name']]['label'] : 'Original';
+      $summary = t('Image size @style', array(
+        '@style' => $style_name,
+      ));
+      return $summary;
+    case 'hasta_cms_image_date':  
+      $settings = $display['settings'];
+      $image_styles = image_styles();
+      $style_name = isset($image_styles[$settings['image_style_name']]['label']) ? $image_styles[$settings['image_style_name']]['label'] : 'Original';
+      $summary = t('Image size @style', array(
+        '@style' => $style_name,
+      ));
+      return $summary;
+
+
+    case 'hasta_cms_title':  
+      $settings = $display['settings'];
+      $summary = t('Title @tag', array(
+        '@tag' => $settings['tag'],
+      ));
+      return $summary;
+    case 'hasta_cms_price':  
+      $settings = $display['settings'];
+      $summary = t('Title @tag', array(
+        '@tag' => $settings['tag'],
+      ));
+      return $summary;
+
+    case 'hasta_cms_images_slider':  
+      $settings = $display['settings'];
+      $image_styles = image_styles();
+      $style_name = isset($image_styles[$settings['image_style_name']]['label']) ? $image_styles[$settings['image_style_name']]['label'] : 'Original';
+      $summary = t('Image size @style', array(
+        '@style' => $style_name,
+      ));
+      return $summary;
+  }
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function hasta_cms_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  if(!count($items)) {
+    return;
+  }
+  switch($display['type']) {
+    case 'hasta_cms_image_link':
+      global $last_loaded_view_node;
+      $element = array();
+      $settings = $display['settings'];
+      $output = '<div class="shop-product-holder">
+        <a href="' . url('node/' . $last_loaded_view_node) . '">
+          <div class="image-holder">
+            <div class="hoverbox"><i class="fa fa-link"></i></div>
+            ' . theme('image_style', array('style_name' => $settings['image_style_name'], 'path' => $items[0]['uri'])) . ' 
+          </div>
+        </a>
+      </div>
+      <div class="clearfix"></div>';
+      $element[0]['#markup'] = $output;
+      return $element;
+    case 'hasta_cms_images_main_small':
+      $element = array();
+      $settings = $display['settings'];
+      $image = array_shift($items);
+      $output = '<div class="product_preview_left bmargin">
+        <div class="gallery">
+          <div class="full"> 
+            ' . theme('image_style', array('style_name' => $settings['image_style_name'], 'path' => $image['uri'])) .'
+          </div>
+          <div class="previews"> ';
+      foreach ($items as $delta => $item) {
+        $image = theme('image_style', array('style_name' => $settings['image_style_name_small'], 'path' => $item['uri']));
+        $output .= '<a ' . ($delta == 0 ? 'class="selected"' : '') . ' data-full="' . file_create_url($item['uri']) . '">' . $image . '</a>';
+      }
+      $output .= '</div></div></div>';
+      $element[0]['#markup'] = $output;
+      return $element;
+    case 'hasta_cms_image_date':
+      $element = array();
+      $settings = $display['settings'];
+      $output = '';
+      foreach ($items as $delta => $item) {
+        $date =  date('d', $entity->created) . '  <span>' . date('M, Y', $entity->created);
+        if(isset($settings['image_style_name']) && $settings['image_style_name']) {
+          $img = theme('image_style', array('style_name' => $settings['image_style_name'], 'path' => $item['uri']));
+        }
+        else {
+          $img = theme('image', array('title' => '', 'path' => $item['uri']));
+        }
+        $output .= '<div class="blog-holder-12">
+        <div class="image-holder">
+          <div class="overlay bg-opacity-1">
+            <div class="post-date-box three"> ' . $date . '</span> </div>
+            <div class="post-date-box three four"> ' . $date . '</span> </div>
+          </div>
+          ' . $img . '
+        </div></div>';
+      }
+      $element[0]['#markup'] = $output;
+      return $element;
+    case 'hasta_cms_date_underline':
+      $element = array();
+      $output = '';
+      foreach ($items as $delta => $item) {
+        $output .= '<div class = "clearfix"><span class="pull-left">' . t('Date') . '</span><span class="pull-right">' . date('d F, Y', strtotime($item['value'])) . '</span><div class="divider-line solid light opacity-7 margin"></div></div>';
+      }
+      $element[0]['#markup'] = $output;
+      return $element;
+    case 'hasta_cms_tags':
+      $element = array();
+      $output = '<ul class = "tags-2">';
+      $terms = array();
+      foreach ($items as $delta => $item) {
+        $terms[] = $item['tid'];
+      }
+      $terms = taxonomy_term_load_multiple($terms, array());
+      foreach ($terms as $tid => $item) {
+        $output .= '<li>' . l($item->name, 'taxonomy/term/' . $tid) . '</li>';
+      }
+      $output .= '</ul><div class = "clearfix"></div>';
+      $element[0]['#markup'] = $output;
+      return $element;
+
+
+    case 'hasta_cms_title':
+      $element = array();
+      $settings = $display['settings'];
+      $output = '';
+      $tag = $settings['tag'];
+      foreach ($items as $delta => $item) {
+        $output .= '<' . $tag . ' class = "text-red-4">' . (isset($item['format']) && $item['format'] ? check_markup($item['value'], $item['format']) : $item['value']) . '</' . $tag . '>';
+      }
+      $element[0]['#markup'] = $output;
+      return $element;
+    case 'hasta_cms_price':
+      $element = array();
+      $settings = $display['settings'];
+      $output = '';
+      $tag = $settings['tag'];
+      foreach ($items as $delta => $item) {
+        $currency_code = $item['currency_code'];
+        $amount = $item['amount'];
+        $price = commerce_currency_format($amount, $currency_code);
+        $output .= '<' . $tag . ' class = "text-red-4">' . $price . '</' . $tag . '>';
+      }
+      $element[0]['#markup'] = $output;
+      return $element;
+
+    case 'hasta_cms_images_slider':
+      $element = array();
+      $settings = $display['settings'];
+
+      $output = '<ul class="clearlist content-slider mb-40">';
+      foreach ($items as $delta => $item) {
+        $output .= '<li>' . theme('image_style', array('style_name' => $settings['image_style_name'], 'path' => $item['uri'])) . '</li>';
+      }
+      $output .= '</ul>';
+      
+      $element[0]['#markup'] = $output;
+      return $element;
+    case 'hasta_cms_lead_text':
+      $element = array();
+      $output = '';
+      foreach ($items as $delta => $item) {
+        $output .= '<div class = "lead">' . check_markup($item['value'], $item['format']) . '</div>';
+      }
+      
+      $element[0]['#markup'] = $output;
+      return $element;
+    case 'hasta_cms_social_links':
+      $element = array();
+      $output = '<div class = "team-social-links">';
+      foreach ($items as $delta => $item) {
+        $output .= '<a href="' . $item['url'] . '" target = "_blank"><i class=" ' . $item['title'] . '"></i></a>';
+      }
+      $output .= '</div>';
+      $element[0]['#markup'] = $output;
+      return $element;
+    case 'hasta_cms_button_link':
+      $element = array();
+      $output = '';
+      foreach ($items as $delta => $item) {
+        $output .= '<a href="' . $item['url'] . '" target = "_blank" class = "btn btn-mod btn-border btn-round btn-medium">' . t($item['title']) . '</a>';
+      }
+      $element[0]['#markup'] = $output;
+      return $element;
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for the node type form.
+ */
+function hasta_cms_form_node_type_form_alter(&$form, &$form_state) {
+  $form['hasta_cms'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Hasta'),
+    '#weight' => 8,
+    '#collapsible' => TRUE,
+    '#group' => 'additional_settings',
+  );
+  $form['hasta_cms']['hasta_cms_author_info'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Author Info Field'),
+    '#description' => t('When checked, <em>Hasta: Author Info</em> will be active for this node type (with settings as specified below)'),
+    '#default_value' => variable_get('hasta_cms_author_info_' . $form['#node_type']->type, 0),
+  );
+  $form['hasta_cms']['hasta_cms_related_posts'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable Related Posts block'),
+    '#description' => t('When checked, <em>Hasta: Related Posts</em> will be active for this node type (with settings as specified below)'),
+    '#default_value' => variable_get('hasta_cms_related_posts_' . $form['#node_type']->type, 0),
+  );
+}
+
+/**
+ * Implements hook_node_type_update().
+ */
+function hasta_cms_node_type_update($info) {
+  if (!empty($info->old_type) && $info->type != $info->old_type) {
+    $settings = array(
+      'hasta_cms_author_info',
+      'hasta_cms_related_posts'
+    );
+
+    foreach ($settings as $setting) {
+      if ($var = variable_get($setting .'_'. $info->old_type, NULL)) {
+        variable_set($setting .'_'. $info->type, $var);
+      }
+      variable_del($setting .'_'. $info->old_type);
+    }
+  }
+}
+
+/**
+ * Implements hook_node_type_delete().
+ */
+function hasta_cms_node_type_delete($info) {
+  $settings = array(
+    'hasta_cms_author_info',
+    'hasta_cms_related_posts'
+  );
+
+  foreach ($settings as $setting) {
+    variable_del($setting .'_'. $info->type);
+  }
+}
+
+
+/**
+ * Implements hook_field_extra_fields().
+ */
+function hasta_cms_field_extra_fields() {
+  $items = array();
+
+  $node_types = array_keys(node_type_get_types());
+
+  foreach ($node_types as $type) {
+    if (variable_get('hasta_cms_author_info_' . $type, 0)) {
+      $items['node'][$type]['display']['hasta_author'] = array(
+        'label'       => t('Hasta: Author info'),
+        'description' => t('Block with Author picture and his description.'),
+        'weight'      => 10,
+      );
+    }
+    if (variable_get('hasta_cms_related_posts_' . $type, 0)) {
+      $items['node'][$type]['display']['hasta_related_posts'] = array(
+        'label'       => t('Hasta: Related Posts'),
+        'description' => t('Block with nodes with the same "Categories" field.'),
+        'weight'      => 11,
+      );
+    }
+  }
+  return $items;
+}
+
+/**
+ * Implements hook_node_view().
+ */
+function hasta_cms_node_view($node, $view_mode, $language) {
+  global $last_loaded_view_node;
+  $last_loaded_view_node = $node->nid;
+  if (variable_get('hasta_cms_author_info_' . $node->type, 0)) {
+    $node->content['hasta_author']['#markup'] = theme('hasta_cms_author_info', array('node' => $node));
+  }
+  if (variable_get('hasta_cms_related_posts_' . $node->type, 0)) {
+    $view = views_embed_view('related_posts', 'default', $node->type);
+    $node->content['hasta_related_posts']['#markup'] = theme('hasta_cms_related_posts', array('view' => $view));
+  }
+}

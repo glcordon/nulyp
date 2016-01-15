@@ -1,0 +1,97 @@
+.form-item label {
+  display: block;
+}
+.form-type-checkbox label{
+  display: inline-block;
+}
+
+/* Color Radios */
+.color-radios input[type="radio"] {
+  display:none;
+}
+.color-radios .form-item{
+  display: inline-block;
+}
+.color-radios label {
+  display: inline-block !important;
+  width: 32px;
+  height: 32px;
+  border: 2px solid transparent !important;
+  text-indent: -9999px;
+}
+.color-radios input[type="radio"]:checked + label {
+  border: 2px solid #3d3d3d !important;
+}
+#edit-skin-default + label{
+  background: #fd602c;
+}
+#edit-skin-lightblue + label{
+  background: #37c6f5;
+}
+#edit-skin-orange + label{
+  background: #f871cb;
+}
+#edit-skin-green + label{
+  background: #ff871c;
+}
+#edit-skin-pink + label{
+  background: #ff2851;
+}
+#edit-skin-red + label{
+  background: #e93e21;
+}
+#edit-skin-purple + label{
+  background: #c762cb;
+}
+#edit-skin-bridge + label{
+  background: #a5d549;
+}
+#edit-skin-yellow + label{
+  background: #ffd133;
+}
+#edit-skin-violet + label{
+  background: #573398;
+}
+#edit-skin-cyan + label{
+  background: #17c9e3;
+}
+#edit-skin-mossgreen + label{
+  background: #adb218;
+}
+
+#edit-bg-image-bg1 + label{
+  background: url(../images/bg-pattrens/bg.png);
+}
+#edit-bg-image-bg2 + label{
+  background: url(../images/bg-pattrens/bg2.png);
+}
+#edit-bg-image-bg3 + label{
+  background: url(../images/bg-pattrens/bg3.png);
+}
+#edit-bg-image-bg4 + label{
+  background: url(../images/bg-pattrens/bg4.png);
+}
+#edit-bg-image-bg5 + label{
+  background: url(../images/bg-pattrens/bg5.png);
+}
+#edit-bg-image-bg6 + label{
+  background: url(../images/bg-pattrens/bg6.png);
+}
+#edit-bg-image-bg7 + label{
+  background: url(../images/bg-pattrens/bg7.jpg);
+}
+#edit-bg-image-bg8 + label{
+  background: url(../images/bg-pattrens/bg8.jpg);
+}
+#edit-bg-image-bg9 + label{
+  background: url(../images/bg-pattrens/bg9.jpg);
+}
+#edit-bg-image-bg10 + label{
+  background: url(../images/bg-pattrens/bg10.jpg);
+}
+#edit-bg-image-bg11 + label{
+  background: url(../images/bg-pattrens/bg11.jpg);
+}
+#edit-bg-image-bg12 + label{
+  background: url(../images/bg-pattrens/bg12.jpg);
+}
