@@ -1,7 +1,0 @@
-<?php
-/**
- * @file
- * Code for the Hasta Commerce feature.
- */
-
-include_once 'hasta_commerce.features.inc';
